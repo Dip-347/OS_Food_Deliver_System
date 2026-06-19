@@ -186,8 +186,8 @@ const Dashboard = () => {
             <h3>Menu Management</h3>
             <p className="text-muted">Add or edit your menu items.</p>
           </div>
-          <div className="widget" onClick={() => setActiveTab('analytics')} style={{ cursor: 'pointer' }}>
-            <h3>Analytics</h3>
+          <div className="widget" onClick={() => setActiveTab('performance')} style={{ cursor: 'pointer' }}>
+            <h3>Performance</h3>
             <p className="text-muted">Track your revenue and performance.</p>
           </div>
         </div>
@@ -202,7 +202,7 @@ const Dashboard = () => {
       return <OrderManager restaurantId={myRestaurantId} />;
     }
 
-    if (activeTab === 'analytics') {
+    if (activeTab === 'performance') {
       return <RestaurantAnalytics restaurantId={myRestaurantId} />;
     }
 
@@ -224,7 +224,7 @@ const Dashboard = () => {
       return <HistoryPage deliveryBoyId={myDeliveryBoyId} />;
     }
 
-    if (activeTab === 'analytics') {
+    if (activeTab === 'performance') {
       return <DeliveryAnalytics deliveryBoyId={myDeliveryBoyId} />;
     }
 
@@ -273,7 +273,7 @@ const Dashboard = () => {
                     </span>
                   )}
                 </li>
-                <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</li>
+                <li className={activeTab === 'performance' ? 'active' : ''} onClick={() => setActiveTab('performance')}>Performance</li>
               </>
             )}
             
@@ -282,7 +282,7 @@ const Dashboard = () => {
                 {myDeliveryBoyId ? (
                   <>
                     <li className={activeTab === 'delivery_tasks' ? 'active' : ''} onClick={() => setActiveTab('delivery_tasks')}>Delivery Tasks</li>
-                    <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</li>
+                    <li className={activeTab === 'performance' ? 'active' : ''} onClick={() => setActiveTab('performance')}>Performance</li>
                     <li>Simulation View</li>
                     <li className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>History</li>
                   </>

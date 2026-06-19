@@ -9,12 +9,13 @@ const RestaurantAnalytics = ({ restaurantId }: { restaurantId: string }) => {
     totalOrders: 0
   });
   const [chartData, setChartData] = useState<any[]>([]);
+  const [topItems, setTopItems] = useState<{name: string, count: number}[]>([]);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       const { data: orders } = await supabase
         .from('orders')
-        .select('total_amount, created_at')
+        .select('total_amount, created_at, id')
         .eq('restaurant_id', restaurantId)
         .eq('status', 'delivered');
 
@@ -29,7 +30,9 @@ const RestaurantAnalytics = ({ restaurantId }: { restaurantId: string }) => {
         };
       });
 
-      if (orders) {
+      let topSelling: Record<string, number> = {};
+
+      if (orders && orders.length > 0) {
         orders.forEach(order => {
           revenue += Number(order.total_amount);
           const orderDate = new Date(order.created_at).toISOString().split('T')[0];
@@ -38,13 +41,36 @@ const RestaurantAnalytics = ({ restaurantId }: { restaurantId: string }) => {
             last7Days[dayIndex].sales += Number(order.total_amount);
           }
         });
+
+        const orderIds = orders.map(o => o.id);
+        
+        // Fetch order items to calculate top selling
+        const { data: items } = await supabase
+          .from('order_items')
+          .select('quantity, menu_items(name)')
+          .in('order_id', orderIds);
+
+        if (items) {
+          items.forEach((item: any) => {
+            const name = item.menu_items?.name;
+            if (name) {
+              topSelling[name] = (topSelling[name] || 0) + item.quantity;
+            }
+          });
+        }
       }
+
+      const topItemsArray = Object.keys(topSelling)
+        .map(key => ({ name: key, count: topSelling[key] }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5); // top 5
 
       setStats({
         totalRevenue: revenue,
         totalOrders: orders?.length || 0
       });
       setChartData(last7Days);
+      setTopItems(topItemsArray);
       setLoading(false);
     };
 
@@ -79,6 +105,21 @@ const RestaurantAnalytics = ({ restaurantId }: { restaurantId: string }) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+      <div className="widget">
+        <h3 style={{ marginBottom: '16px' }}>Top Selling Menu Items</h3>
+        {topItems.length === 0 ? (
+          <p className="text-muted">No sales data yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {topItems.map((item, index) => (
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)' }}>
+                <span style={{ fontWeight: 'bold' }}>{item.name}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{item.count} sold</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
