@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { Bell } from 'lucide-react';
 import AdminAnalytics from '../components/admin/AdminAnalytics';
 import RestaurantApproval from '../components/admin/RestaurantApproval';
 import RiderApproval from '../components/admin/RiderApproval';
@@ -79,7 +80,9 @@ const AdminDashboard = () => {
             <li className={activeTab === 'rider_approval' ? 'active' : ''} onClick={() => setActiveTab('rider_approval')} style={{ color: activeTab === 'rider_approval' ? 'white' : 'inherit' }}>Rider Approval</li>
             <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')} style={{ color: activeTab === 'analytics' ? 'white' : 'inherit' }}>Analytics</li>
             <li className={activeTab === 'order_monitoring' ? 'active' : ''} onClick={() => setActiveTab('order_monitoring')} style={{ color: activeTab === 'order_monitoring' ? 'white' : 'inherit' }}>Order Monitoring</li>
-            <li className={activeTab === 'notifications' ? 'active' : ''} onClick={() => setActiveTab('notifications')} style={{ color: activeTab === 'notifications' ? 'white' : 'inherit' }}>Notifications</li>
+            <li className={activeTab === 'notifications' ? 'active' : ''} onClick={() => setActiveTab('notifications')} style={{ color: activeTab === 'notifications' ? 'white' : 'inherit', display: 'flex', alignItems: 'center' }}>
+              <Bell color="#f59e0b" size={20} />
+            </li>
           </ul>
         </nav>
         <div className="sidebar-footer">

@@ -30,7 +30,7 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
       .from('orders')
       .select('*, restaurants(name, lat, lng), users(full_name), order_items(quantity, menu_items(name))')
       .eq('rider_id', deliveryBoyId)
-      .in('status', ['accepted', 'on_way', 'picked_up'])
+      .in('status', ['accepted', 'on_way', 'picked_up', 'arrived'])
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -39,15 +39,18 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
       setActiveDelivery(active);
     } else {
       setActiveDelivery(null);
-      // 2. Fetch available assigned orders (pending_rider and assigned to this rider)
+      // 2. Fetch available assigned orders (pending_rider and assigned to this rider, or ready_for_pickup for all)
       const { data: available } = await supabase
         .from('orders')
         .select('*, restaurants(name, lat, lng), users(full_name), order_items(quantity, menu_items(name))')
-        .eq('status', 'pending_rider')
-        .eq('rider_id', deliveryBoyId)
+        .in('status', ['pending_rider', 'ready_for_pickup'])
+        .or(`rider_id.eq.${deliveryBoyId},rider_id.is.null`)
         .order('created_at', { ascending: true });
         
-      if (available) setAvailableOrders(available);
+      if (available) {
+        const filtered = available.filter((o: any) => !(o.rejected_by || []).includes(deliveryBoyId));
+        setAvailableOrders(filtered);
+      }
     }
     setLoading(false);
   };
@@ -60,7 +63,7 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
     const subscription = supabase
       .channel('rider-orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'UPDATE' && payload.new.status === 'pending_rider' && payload.new.rider_id === deliveryBoyId) {
+        if (payload.eventType === 'UPDATE' && payload.new.status === 'ready_for_pickup') {
           setToastMessage('🔔 New Delivery Request!');
           setShowToast(true);
         }
@@ -85,10 +88,10 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
     const { data, error } = await supabase
       .from('orders')
       .update({ 
-        status: 'accepted'
+        status: 'accepted',
+        rider_id: deliveryBoyId // ensure rider is set if they picked it from pool
       })
       .eq('id', orderId)
-      .eq('rider_id', deliveryBoyId)
       .select()
       .single();
 
@@ -113,8 +116,7 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
         rider_id: null,
         rejected_by: newRejectedBy
       })
-      .eq('id', orderId)
-      .eq('rider_id', deliveryBoyId);
+      .eq('id', orderId);
 
     if (error) {
       alert('Failed to reject order.');

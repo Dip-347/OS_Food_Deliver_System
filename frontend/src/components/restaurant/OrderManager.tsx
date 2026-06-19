@@ -76,9 +76,18 @@ const OrderManager = ({ restaurantId }: { restaurantId: string }) => {
   }, [restaurantId]);
 
   const updateStatus = async (id: string, newStatus: string) => {
+    const updateData: any = { status: newStatus };
+    
+    // If retrying or first time ready, reset the rider pool and generate OTP
+    if (newStatus === 'ready_for_pickup') {
+      updateData.rider_id = null;
+      updateData.rejected_by = [];
+      updateData.pickup_otp = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus })
+      .update(updateData)
       .eq('id', id);
 
     if (error) alert('Failed to update status: ' + error.message);

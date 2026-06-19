@@ -31,6 +31,7 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
   const [error, setError] = useState<string | null>(null);
   const [otpInput, setOtpInput] = useState('');
   const [trackingActive, setTrackingActive] = useState(false);
+  const [deliveryOtpDisplay, setDeliveryOtpDisplay] = useState<string | null>(null);
 
   // Status progression: accepted -> picked_up -> delivered
   const verifyOtp = async () => {
@@ -70,14 +71,19 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
     }
   };
 
-  const completeDelivery = async () => {
+  const arrivedAtDestination = async () => {
     setLoading(true);
     setError(null);
     
-    // Change status to delivered
+    // Generate 4-digit OTP
+    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
     const { error: updateError } = await supabase
       .from('orders')
-      .update({ status: 'delivered' })
+      .update({ 
+        status: 'arrived',
+        delivery_otp: generatedOtp
+      })
       .eq('id', order.id);
 
     if (updateError) {
@@ -86,21 +92,26 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
       return;
     }
 
-    // Add earnings to deliveryBoy profile ($5 base pay per delivery)
-    if (user) {
-      const { data: deliveryBoyData } = await supabase.from('riders').select('earnings, total_deliveries').eq('user_id', user.id).single();
-      if (deliveryBoyData) {
-        await supabase.from('riders').update({
-          earnings: (deliveryBoyData.earnings || 0) + 5.00,
-          total_deliveries: (deliveryBoyData.total_deliveries || 0) + 1
-        }).eq('user_id', user.id);
-      }
-    }
-
+    setDeliveryOtpDisplay(generatedOtp);
+    setStatus('arrived');
     setLoading(false);
-    setStatus('delivered');
-    onDeliveryComplete();
   };
+
+  useEffect(() => {
+    // Listen for customer confirming delivery
+    const channel = supabase.channel(`order-status-${order.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, (payload) => {
+        if (payload.new.status === 'delivered') {
+          setStatus('delivered');
+          onDeliveryComplete();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order.id, onDeliveryComplete]);
 
   const lastDbUpdate = useRef<number>(0);
 
@@ -244,12 +255,23 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
             <button 
               className="btn btn-full" 
               style={{ padding: '16px', fontSize: '1.1rem', backgroundColor: '#16a34a', color: 'white', border: 'none' }}
-              onClick={completeDelivery}
+              onClick={arrivedAtDestination}
               disabled={loading}
             >
               <CheckCircle size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-              Complete Delivery
+              Arrived at Destination
             </button>
+          </div>
+        )}
+
+        {status === 'arrived' && (
+          <div className="widget" style={{ textAlign: 'center', padding: '24px', backgroundColor: '#fff7ed', border: '2px dashed #f97316' }}>
+            <h3 style={{ color: '#ea580c', marginBottom: '8px' }}>You have arrived!</h3>
+            <p className="text-muted" style={{ marginBottom: '16px' }}>Show this OTP to the customer so they can confirm receipt on their app.</p>
+            <div style={{ fontSize: '3rem', fontWeight: 'bold', letterSpacing: '8px', color: '#ea580c', margin: '20px 0' }}>
+              {deliveryOtpDisplay || order.delivery_otp || '----'}
+            </div>
+            <p style={{ fontSize: '0.9rem', color: '#9a3412' }}>Waiting for customer to verify...</p>
           </div>
         )}
       </div>

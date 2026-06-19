@@ -35,6 +35,9 @@ interface Order {
 const OrderTracking = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [otpInputs, setOtpInputs] = useState<Record<string, string>>({});
+  const [verifying, setVerifying] = useState<Record<string, boolean>>({});
+  const [errorMsg, setErrorMsg] = useState<Record<string, string>>({});
   const { user } = useAuth();
 
   useEffect(() => {
@@ -110,9 +113,61 @@ const OrderTracking = () => {
       case 'accepted': return '#f59e0b';
       case 'picked_up': return '#ec4899';
       case 'on_way': return '#ec4899';
+      case 'arrived': return '#f97316';
       case 'delivered': return 'var(--primary)';
       default: return 'gray';
     }
+  };
+
+  const handleVerifyDeliveryOtp = async (orderId: string) => {
+    setVerifying(prev => ({ ...prev, [orderId]: true }));
+    setErrorMsg(prev => ({ ...prev, [orderId]: '' }));
+
+    const inputOtp = otpInputs[orderId] || '';
+
+    // Fetch the actual OTP from the database
+    const { data: orderData, error: fetchError } = await supabase
+      .from('orders')
+      .select('delivery_otp, rider_id')
+      .eq('id', orderId)
+      .single();
+
+    if (fetchError || !orderData) {
+      setErrorMsg(prev => ({ ...prev, [orderId]: 'Failed to verify OTP.' }));
+      setVerifying(prev => ({ ...prev, [orderId]: false }));
+      return;
+    }
+
+    if (orderData.delivery_otp !== inputOtp.trim()) {
+      setErrorMsg(prev => ({ ...prev, [orderId]: 'Incorrect OTP. Check with the rider.' }));
+      setVerifying(prev => ({ ...prev, [orderId]: false }));
+      return;
+    }
+
+    // Update order status to delivered
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ status: 'delivered' })
+      .eq('id', orderId);
+
+    if (updateError) {
+      setErrorMsg(prev => ({ ...prev, [orderId]: updateError.message }));
+      setVerifying(prev => ({ ...prev, [orderId]: false }));
+      return;
+    }
+
+    // Add earnings to rider ($5 base pay)
+    if (orderData.rider_id) {
+      const { data: riderInfo } = await supabase.from('riders').select('earnings, total_deliveries').eq('id', orderData.rider_id).single();
+      if (riderInfo) {
+        await supabase.from('riders').update({
+          earnings: (riderInfo.earnings || 0) + 5.00,
+          total_deliveries: (riderInfo.total_deliveries || 0) + 1
+        }).eq('id', orderData.rider_id);
+      }
+    }
+
+    setVerifying(prev => ({ ...prev, [orderId]: false }));
   };
 
   if (loading) return <div>Loading orders...</div>;
@@ -146,7 +201,7 @@ const OrderTracking = () => {
                   fontSize: '0.8rem',
                   border: `1px solid ${getStatusColor(order.status)}`
                 }}>
-                  {order.status === 'on_way' ? 'Out for Delivery' : order.status.replace('_', ' ')}
+                  {order.status === 'on_way' ? 'Out for Delivery' : order.status === 'arrived' ? 'Rider Arrived' : order.status.replace('_', ' ')}
                 </span>
               </div>
             </div>
@@ -188,6 +243,35 @@ const OrderTracking = () => {
                   <span style={{ width: '8px', height: '8px', backgroundColor: '#16a34a', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }}></span>
                   Live Tracking
                 </div>
+              </div>
+            )}
+
+            {/* OTP Verification for Arrived Orders */}
+            {order.status === 'arrived' && (
+              <div className="widget" style={{ textAlign: 'center', padding: '24px', backgroundColor: '#fff7ed', border: '2px dashed #f97316' }}>
+                <h3 style={{ color: '#ea580c', marginBottom: '8px' }}>Your rider has arrived!</h3>
+                <p className="text-muted" style={{ marginBottom: '16px' }}>Please enter the 4-digit code shown on the rider's phone to confirm delivery.</p>
+                
+                {errorMsg[order.id] && <div style={{ color: '#ef4444', marginBottom: '12px', fontWeight: 'bold' }}>{errorMsg[order.id]}</div>}
+                
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <input 
+                    type="text" 
+                    maxLength={4}
+                    value={otpInputs[order.id] || ''}
+                    onChange={(e) => setOtpInputs(prev => ({ ...prev, [order.id]: e.target.value.replace(/\D/g, '') }))}
+                    placeholder="0000"
+                    style={{ width: '120px', textAlign: 'center', fontSize: '1.5rem', letterSpacing: '4px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+                  />
+                </div>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '16px', width: '100%', backgroundColor: '#ea580c' }}
+                  onClick={() => handleVerifyDeliveryOtp(order.id)}
+                  disabled={verifying[order.id] || (otpInputs[order.id] || '').length !== 4}
+                >
+                  {verifying[order.id] ? 'Verifying...' : 'Confirm Receipt'}
+                </button>
               </div>
             )}
 
