@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Bell, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 // Customer Components
@@ -46,6 +46,9 @@ const Dashboard = () => {
 
   // State for notification badge
   const [activeOrderCount, setActiveOrderCount] = useState(0);
+  
+  // State for system notifications
+  const [systemNotification, setSystemNotification] = useState<{title: string, message: string} | null>(null);
 
   useEffect(() => {
     if (profile?.role === 'restaurant' && user) {
@@ -112,6 +115,23 @@ const Dashboard = () => {
       supabase.removeChannel(subscription);
     };
   }, [myRestaurantId]);
+
+  useEffect(() => {
+    // Listen for system notifications
+    const channel = supabase.channel('system_notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'system_notifications' }, (payload) => {
+        const { target_role, title, message } = payload.new;
+        if (target_role === 'all' || target_role === profile?.role) {
+          setSystemNotification({ title, message });
+          setTimeout(() => setSystemNotification(null), 8000); // auto-hide
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.role]);
 
   const handleRestaurantSelect = (id: string, name: string) => {
     setSelectedRestaurant({ id, name });
@@ -308,7 +328,25 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      <main className="dashboard-content">
+      <main className="dashboard-content" style={{ position: 'relative' }}>
+        {systemNotification && (
+          <div style={{
+            position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+            backgroundColor: '#3b82f6', color: 'white', padding: '16px 24px', borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', zIndex: 100, display: 'flex', gap: '16px', alignItems: 'flex-start',
+            maxWidth: '500px', width: '90%'
+          }}>
+            <Bell size={24} style={{ flexShrink: 0 }} />
+            <div style={{ flexGrow: 1 }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '1.1rem' }}>{systemNotification.title}</h4>
+              <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>{systemNotification.message}</p>
+            </div>
+            <button onClick={() => setSystemNotification(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', opacity: 0.7 }}>
+              <X size={20} />
+            </button>
+          </div>
+        )}
+
         <header className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{activeTab.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</h2>
           

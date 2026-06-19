@@ -6,6 +6,7 @@ import AdminAnalytics from '../components/admin/AdminAnalytics';
 import RestaurantApproval from '../components/admin/RestaurantApproval';
 import RiderApproval from '../components/admin/RiderApproval';
 import OrderMonitoring from '../components/admin/OrderMonitoring';
+import NotificationBroadcaster from '../components/admin/NotificationBroadcaster';
 
 const AdminDashboard = () => {
   const { user, signOut } = useAuth();
@@ -44,6 +45,10 @@ const AdminDashboard = () => {
             <h3>Rider Approval</h3>
             <p className="text-muted">Manage new rider applications.</p>
           </div>
+          <div className="widget" onClick={() => setActiveTab('notifications')} style={{ cursor: 'pointer' }}>
+            <h3>Notifications</h3>
+            <p className="text-muted">Broadcast messages to users.</p>
+          </div>
         </div>
       );
     }
@@ -52,6 +57,7 @@ const AdminDashboard = () => {
     if (activeTab === 'restaurant_approval') return <RestaurantApproval />;
     if (activeTab === 'rider_approval') return <RiderApproval />;
     if (activeTab === 'order_monitoring') return <OrderMonitoring />;
+    if (activeTab === 'notifications') return <NotificationBroadcaster />;
 
     return <div>Content for {activeTab} is coming soon.</div>;
   };
@@ -73,6 +79,7 @@ const AdminDashboard = () => {
             <li className={activeTab === 'rider_approval' ? 'active' : ''} onClick={() => setActiveTab('rider_approval')} style={{ color: activeTab === 'rider_approval' ? 'white' : 'inherit' }}>Rider Approval</li>
             <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')} style={{ color: activeTab === 'analytics' ? 'white' : 'inherit' }}>Analytics</li>
             <li className={activeTab === 'order_monitoring' ? 'active' : ''} onClick={() => setActiveTab('order_monitoring')} style={{ color: activeTab === 'order_monitoring' ? 'white' : 'inherit' }}>Order Monitoring</li>
+            <li className={activeTab === 'notifications' ? 'active' : ''} onClick={() => setActiveTab('notifications')} style={{ color: activeTab === 'notifications' ? 'white' : 'inherit' }}>Notifications</li>
           </ul>
         </nav>
         <div className="sidebar-footer">
