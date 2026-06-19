@@ -16,11 +16,13 @@ import CartSidebar from '../components/customer/CartSidebar';
 import RestaurantApplication from '../components/restaurant/RestaurantApplication';
 import MenuManager from '../components/restaurant/MenuManager';
 import OrderManager from '../components/restaurant/OrderManager';
+import RestaurantAnalytics from '../components/restaurant/RestaurantAnalytics';
 
 // DeliveryBoy Components
 import DeliveryBoyApplication from '../components/deliveryBoy/DeliveryBoyApplication';
 import DeliveryBoyDashboard from '../components/deliveryBoy/DeliveryBoyDashboard';
 import HistoryPage from '../components/deliveryBoy/HistoryPage';
+import DeliveryAnalytics from '../components/deliveryBoy/DeliveryAnalytics';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -184,6 +186,10 @@ const Dashboard = () => {
             <h3>Menu Management</h3>
             <p className="text-muted">Add or edit your menu items.</p>
           </div>
+          <div className="widget" onClick={() => setActiveTab('analytics')} style={{ cursor: 'pointer' }}>
+            <h3>Analytics</h3>
+            <p className="text-muted">Track your revenue and performance.</p>
+          </div>
         </div>
       );
     }
@@ -194,6 +200,10 @@ const Dashboard = () => {
 
     if (activeTab === 'active_orders') {
       return <OrderManager restaurantId={myRestaurantId} />;
+    }
+
+    if (activeTab === 'analytics') {
+      return <RestaurantAnalytics restaurantId={myRestaurantId} />;
     }
 
     return <div>Content for {activeTab} is not implemented yet.</div>;
@@ -212,6 +222,10 @@ const Dashboard = () => {
 
     if (activeTab === 'history') {
       return <HistoryPage deliveryBoyId={myDeliveryBoyId} />;
+    }
+
+    if (activeTab === 'analytics') {
+      return <DeliveryAnalytics deliveryBoyId={myDeliveryBoyId} />;
     }
 
     return <div>Content for {activeTab} is not implemented yet.</div>;
@@ -259,7 +273,7 @@ const Dashboard = () => {
                     </span>
                   )}
                 </li>
-                <li>Analytics</li>
+                <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</li>
               </>
             )}
             
@@ -268,6 +282,7 @@ const Dashboard = () => {
                 {myDeliveryBoyId ? (
                   <>
                     <li className={activeTab === 'delivery_tasks' ? 'active' : ''} onClick={() => setActiveTab('delivery_tasks')}>Delivery Tasks</li>
+                    <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>Analytics</li>
                     <li>Simulation View</li>
                     <li className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>History</li>
                   </>

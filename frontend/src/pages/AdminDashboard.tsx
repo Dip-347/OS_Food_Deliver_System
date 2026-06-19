@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import AdminAnalytics from '../components/admin/AdminAnalytics';
+import RestaurantApproval from '../components/admin/RestaurantApproval';
+import RiderApproval from '../components/admin/RiderApproval';
+import OrderMonitoring from '../components/admin/OrderMonitoring';
 
 const AdminDashboard = () => {
   const { user, signOut } = useAuth();
@@ -43,6 +47,11 @@ const AdminDashboard = () => {
         </div>
       );
     }
+
+    if (activeTab === 'analytics') return <AdminAnalytics />;
+    if (activeTab === 'restaurant_approval') return <RestaurantApproval />;
+    if (activeTab === 'rider_approval') return <RiderApproval />;
+    if (activeTab === 'order_monitoring') return <OrderMonitoring />;
 
     return <div>Content for {activeTab} is coming soon.</div>;
   };
