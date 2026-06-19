@@ -1,0 +1,277 @@
+import { useEffect, useState, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
+import { MapPin, Navigation, CheckCircle, KeyRound, MessageSquare } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import ChatBox from '../shared/ChatBox';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in React-Leaflet
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+interface DeliveryManagerProps {
+  order: any;
+  onDeliveryComplete: () => void;
+}
+
+const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) => {
+  const { user } = useAuth();
+  const [status, setStatus] = useState(order.status);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [otpInput, setOtpInput] = useState('');
+  const [trackingActive, setTrackingActive] = useState(false);
+
+  // Status progression: accepted -> picked_up -> delivered
+  const verifyOtp = async () => {
+    setLoading(true);
+    setError(null);
+
+    // Validate OTP against database
+    const { data, error: fetchError } = await supabase
+      .from('orders')
+      .select('pickup_otp')
+      .eq('id', order.id)
+      .single();
+
+    if (fetchError || !data) {
+      setError('Failed to verify OTP.');
+      setLoading(false);
+      return;
+    }
+
+    if (data.pickup_otp !== otpInput.trim()) {
+      setError('Invalid OTP. Please check with the restaurant.');
+      setLoading(false);
+      return;
+    }
+
+    // OTP Matches! Update status to picked_up
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ status: 'picked_up' })
+      .eq('id', order.id);
+
+    setLoading(false);
+    if (updateError) {
+      setError(updateError.message);
+    } else {
+      setStatus('picked_up');
+    }
+  };
+
+  const completeDelivery = async () => {
+    setLoading(true);
+    setError(null);
+    
+    // Change status to delivered
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ status: 'delivered' })
+      .eq('id', order.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Add earnings to deliveryBoy profile ($5 base pay per delivery)
+    if (user) {
+      const { data: deliveryBoyData } = await supabase.from('riders').select('earnings, total_deliveries').eq('user_id', user.id).single();
+      if (deliveryBoyData) {
+        await supabase.from('riders').update({
+          earnings: (deliveryBoyData.earnings || 0) + 5.00,
+          total_deliveries: (deliveryBoyData.total_deliveries || 0) + 1
+        }).eq('user_id', user.id);
+      }
+    }
+
+    setLoading(false);
+    setStatus('delivered');
+    onDeliveryComplete();
+  };
+
+  const lastDbUpdate = useRef<number>(0);
+
+  useEffect(() => {
+    let watchId: number;
+
+    if (status === 'picked_up' || status === 'on_way') {
+      setTrackingActive(true);
+      const channel = supabase.channel(`tracking:${order.id}`);
+      channel.subscribe();
+
+      if ('geolocation' in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            channel.send({
+              type: 'broadcast',
+              event: 'location',
+              payload: { lat: latitude, lng: longitude }
+            });
+
+            // Update database at most every 5 seconds to avoid rate limits
+            const now = Date.now();
+            if (now - lastDbUpdate.current > 5000 && user) {
+              lastDbUpdate.current = now;
+              supabase.from('riders')
+                .update({ current_lat: latitude, current_lng: longitude })
+                .eq('user_id', user.id)
+                .then(({ error }) => {
+                  if (error) console.error('Failed to save location to DB', error);
+                });
+            }
+          },
+          (err) => {
+            console.error('GPS tracking error:', err);
+          },
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+        );
+      }
+
+      return () => {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        supabase.removeChannel(channel);
+        setTrackingActive(false);
+      };
+    }
+  }, [status, order.id, user]);
+
+  return (
+    <div className="soft-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <h2 style={{ marginBottom: '8px' }}>Active Delivery</h2>
+        <div style={{ display: 'inline-block', padding: '6px 16px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--primary)', color: 'white', fontWeight: 'bold' }}>
+          Order #{order.id.split('-')[0]}
+        </div>
+      </div>
+
+      {error && <div className="auth-error">{error}</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="widget">
+          <h4 style={{ color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={16} /> Pickup From
+          </h4>
+          <p style={{ fontWeight: 'bold', margin: 0 }}>{order.restaurants?.name}</p>
+          <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '0.9rem' }}>Restaurant Location</p>
+        </div>
+
+        <div className="widget">
+          <h4 style={{ color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Navigation size={16} /> Deliver To
+          </h4>
+          <p style={{ fontWeight: 'bold', margin: 0 }}>{order.users?.full_name || 'Customer'}</p>
+          <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '0.9rem' }}>{order.delivery_address}</p>
+        </div>
+      </div>
+
+      <div style={{ height: '300px', width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '8px' }}>
+        {(order.restaurants?.lat && order.delivery_lat) ? (
+          <MapContainer 
+            bounds={[[order.restaurants.lat, order.restaurants.lng], [order.delivery_lat, order.delivery_lng]]} 
+            scrollWheelZoom={false} 
+            style={{ height: '100%', width: '100%' }}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            
+            <Marker position={[order.restaurants.lat, order.restaurants.lng]}>
+              <Popup><strong>Pickup:</strong> {order.restaurants.name}</Popup>
+            </Marker>
+            
+            <Marker position={[order.delivery_lat, order.delivery_lng]}>
+              <Popup><strong>Delivery:</strong> {order.delivery_address}</Popup>
+            </Marker>
+          </MapContainer>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', backgroundColor: '#f8f9fa', color: 'var(--text-muted)' }}>
+            Map coordinates unavailable for this order.
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+        {status === 'accepted' && (
+          <div className="widget" style={{ textAlign: 'center', padding: '24px' }}>
+            <div style={{ display: 'inline-flex', padding: '12px', backgroundColor: 'rgba(255, 75, 43, 0.1)', borderRadius: '50%', color: 'var(--primary)', marginBottom: '16px' }}>
+              <KeyRound size={24} />
+            </div>
+            <h3 style={{ marginBottom: '8px' }}>Verify Pickup</h3>
+            <p className="text-muted" style={{ marginBottom: '16px' }}>Enter the 4-digit OTP provided by the restaurant.</p>
+            
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <input 
+                type="text" 
+                maxLength={4}
+                value={otpInput}
+                onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="0000"
+                style={{ width: '120px', textAlign: 'center', fontSize: '1.5rem', letterSpacing: '4px', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+            <button 
+              className="btn btn-primary" 
+              style={{ marginTop: '16px', width: '100%' }}
+              onClick={verifyOtp}
+              disabled={loading || otpInput.length !== 4}
+            >
+              {loading ? 'Verifying...' : 'Confirm Pickup'}
+            </button>
+          </div>
+        )}
+
+        {(status === 'picked_up' || status === 'on_way') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {trackingActive && (
+              <div style={{ textAlign: 'center', padding: '12px', color: '#16a34a', backgroundColor: '#dcfce7', borderRadius: 'var(--radius-md)', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                <span className="live-dot" style={{ width: '10px', height: '10px', backgroundColor: '#16a34a', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }}></span>
+                Live GPS Tracking Active
+              </div>
+            )}
+            
+            <button 
+              className="btn btn-full" 
+              style={{ padding: '16px', fontSize: '1.1rem', backgroundColor: '#16a34a', color: 'white', border: 'none' }}
+              onClick={completeDelivery}
+              disabled={loading}
+            >
+              <CheckCircle size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Complete Delivery
+            </button>
+          </div>
+        )}
+      </div>
+
+      {(status === 'accepted' || status === 'picked_up' || status === 'on_way') && (
+        <div style={{ marginTop: '16px' }}>
+          <h4 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageSquare size={16} color="var(--primary)" /> Message Customer
+          </h4>
+          <ChatBox orderId={order.id} receiverId={order.customer_id} />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default DeliveryManager;
