@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, MapPin } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -22,28 +22,43 @@ const createCustomIcon = (color: string) => {
 
 const customerIcon = createCustomIcon('#3b82f6'); // Blue
 
-function LocationMarker({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number, address: string) => void }) {
-  const [position, setPosition] = useState<L.LatLng | null>(null);
+const fetchAddress = async (lat: number, lng: number, callback: (lat: number, lng: number, address: string) => void) => {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    const data = await res.json();
+    if (data && data.display_name) {
+      callback(lat, lng, data.display_name);
+    } else {
+      callback(lat, lng, `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    }
+  } catch (error) {
+    callback(lat, lng, `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+  }
+};
 
-  useMapEvents({
+function LocationMarker({ 
+  position, 
+  onLocationSelect 
+}: { 
+  position: {lat: number, lng: number} | null, 
+  onLocationSelect: (lat: number, lng: number, address: string) => void 
+}) {
+  const map = useMapEvents({
     click(e) {
-      setPosition(e.latlng);
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.display_name) {
-            onLocationSelect(e.latlng.lat, e.latlng.lng, data.display_name);
-          } else {
-            onLocationSelect(e.latlng.lat, e.latlng.lng, `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
-          }
-        })
-        .catch(() => {
-          onLocationSelect(e.latlng.lat, e.latlng.lng, `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
-        });
+      fetchAddress(e.latlng.lat, e.latlng.lng, onLocationSelect);
     },
   });
 
-    <Marker position={position} icon={customerIcon}></Marker>
+  // Effect to fly to position when it changes from outside (e.g. geolocation)
+  React.useEffect(() => {
+    if (position) {
+      map.flyTo([position.lat, position.lng], 15);
+    }
+  }, [position, map]);
+
+  return position === null ? null : (
+    <Marker position={[position.lat, position.lng]} icon={customerIcon}></Marker>
+  );
 }
 
 const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () => void }) => {
@@ -54,10 +69,35 @@ const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () =
   const [paymentMethod, setPaymentMethod] = useState('cod'); // Default to COD
   const [loading, setLoading] = useState(false);
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null);
+  const [locating, setLocating] = useState(false);
 
   const handleLocationSelect = (lat: number, lng: number, fetchedAddress: string) => {
     setCoordinates({ lat, lng });
     setAddress(fetchedAddress);
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    
+    setLocating(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        fetchAddress(lat, lng, handleLocationSelect);
+        setLocating(false);
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("Unable to retrieve your location. Please ensure location permissions are granted in your browser.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -171,14 +211,25 @@ const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () =
         </div>
 
         <div>
-          <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Select Location on Map</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Select Location on Map</h3>
+            <button 
+              type="button"
+              className="btn btn-secondary" 
+              onClick={handleGetCurrentLocation}
+              disabled={locating}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.85rem' }}
+            >
+              <Navigation size={14} /> {locating ? 'Locating...' : 'Use Current Location'}
+            </button>
+          </div>
           <div style={{ height: '400px', width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
             <MapContainer center={[22.3569, 91.7832]} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <LocationMarker onLocationSelect={handleLocationSelect} />
+              <LocationMarker position={coordinates} onLocationSelect={handleLocationSelect} />
             </MapContainer>
           </div>
           <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '12px', textAlign: 'center' }}>
