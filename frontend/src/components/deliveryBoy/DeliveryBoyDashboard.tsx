@@ -1,9 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DeliveryManager from './DeliveryManager';
 import { Navigation, Bike, MapPin, Power } from 'lucide-react';
 import Toast from '../shared/Toast';
+
+const useRiderAutoLocation = (riderId: string, isOnline: boolean) => {
+  const watchIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isOnline) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return;
+    }
+
+    let lastUpdateTime = 0;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const now = Date.now();
+        if (now - lastUpdateTime > 5000) {
+          lastUpdateTime = now;
+          const { latitude, longitude } = pos.coords;
+          const { error } = await supabase.from('riders').update({ current_lat: latitude, current_lng: longitude }).eq('id', riderId);
+          if (error) console.error('Failed to update rider location:', error.message);
+        }
+      },
+      (error) => console.error("GPS Watch error:", error),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, [isOnline, riderId]);
+};
 
 const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
   const { user } = useAuth();
@@ -15,6 +51,8 @@ const DeliveryBoyDashboard = ({ deliveryBoyId }: { deliveryBoyId: string }) => {
   const [showToast, setShowToast] = useState(false);
 
   const [stats, setStats] = useState({ earnings: 0, rating: 5.0 });
+
+  useRiderAutoLocation(deliveryBoyId, isOnline);
 
   const fetchDeliveryBoyStatus = async () => {
     const { data } = await supabase.from('riders').select('is_available, earnings, rating').eq('id', deliveryBoyId).single();
