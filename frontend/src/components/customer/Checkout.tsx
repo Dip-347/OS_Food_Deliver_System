@@ -11,16 +11,23 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-const createCustomIcon = (color: string) => {
+const createPinIcon = (color: string, svgContent: string) => {
   return L.divIcon({
-    className: 'custom-div-icon',
-    html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    className: 'custom-pin-icon',
+    html: `
+      <div style="width: 36px; height: 36px; background-color: ${color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 3px 3px 6px rgba(0,0,0,0.4);">
+        <div style="transform: rotate(45deg); background-color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          ${svgContent}
+        </div>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36],
   });
 };
 
-const customerIcon = createCustomIcon('#3b82f6'); // Blue
+const customerIcon = createPinIcon('#3b82f6', `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`);
 
 const fetchAddress = async (lat: number, lng: number, callback: (lat: number, lng: number, address: string) => void) => {
   try {

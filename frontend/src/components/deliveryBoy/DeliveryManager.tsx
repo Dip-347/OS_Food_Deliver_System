@@ -114,6 +114,7 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
     };
   }, [order.id, onDeliveryComplete]);
 
+  const lastBroadcast = useRef<number>(0);
   const lastDbUpdate = useRef<number>(0);
 
   useEffect(() => {
@@ -128,14 +129,19 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
         watchId = navigator.geolocation.watchPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
-            channel.send({
-              type: 'broadcast',
-              event: 'location',
-              payload: { lat: latitude, lng: longitude }
-            });
+            const now = Date.now();
+            
+            // Throttle Realtime broadcast to once per second to prevent UI jitter
+            if (now - lastBroadcast.current > 1000) {
+              lastBroadcast.current = now;
+              channel.send({
+                type: 'broadcast',
+                event: 'location',
+                payload: { lat: latitude, lng: longitude }
+              }).catch(err => console.error("Broadcast error", err));
+            }
 
             // Update database at most every 5 seconds to avoid rate limits
-            const now = Date.now();
             if (now - lastDbUpdate.current > 5000 && user) {
               lastDbUpdate.current = now;
               supabase.from('riders')
@@ -149,7 +155,8 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
           (err) => {
             console.error('GPS tracking error:', err);
           },
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+          // Force fresh location by setting maximumAge: 0
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
       }
 
