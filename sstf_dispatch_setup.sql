@@ -5,8 +5,8 @@
 ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS lat NUMERIC;
 ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS lng NUMERIC;
 
--- 2. Update existing restaurants with dummy coordinates for testing (e.g., center of New York)
-UPDATE public.restaurants SET lat = 40.7128, lng = -74.0060 WHERE lat IS NULL;
+-- 2. Update existing restaurants with dummy coordinates for testing (e.g., center of Chattogram)
+UPDATE public.restaurants SET lat = 22.3569, lng = 91.7832 WHERE lat IS NULL;
 
 -- 3. Create the SSTF Dispatch Function
 CREATE OR REPLACE FUNCTION public.assign_closest_rider()

@@ -25,8 +25,8 @@ const RestaurantApplication = ({ onApproved }: { onApproved: () => void }) => {
           description,
           image_url: imageUrl || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=500&q=80',
           is_active: true, // Auto-approved for Phase 3 mock
-          lat: 40.7128 + (Math.random() * 0.1 - 0.05), // Random dummy coordinates around NY
-          lng: -74.0060 + (Math.random() * 0.1 - 0.05)
+          lat: 22.3569 + (Math.random() * 0.05 - 0.025), // Dummy coordinates near Chattogram
+          lng: 91.7832 + (Math.random() * 0.05 - 0.025)
         });
 
       if (error) throw error;

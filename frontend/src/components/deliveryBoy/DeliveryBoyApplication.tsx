@@ -21,8 +21,9 @@ const DeliveryBoyApplication = ({ onApplied }: { onApplied: () => void }) => {
       user_id: user.id,
       vehicle_type,
       license_plate: vehicleType === 'motorcycle' || vehicleType === 'car' ? licensePlate : null,
-      current_lat: 40.7128 + (Math.random() * 0.1 - 0.05), // Dummy coordinates near NY
-      current_lng: -74.0060 + (Math.random() * 0.1 - 0.05)
+      is_available: true,
+      current_lat: 22.3569 + (Math.random() * 0.05 - 0.025), // Dummy coordinates near Chattogram
+      current_lng: 91.7832 + (Math.random() * 0.05 - 0.025)
     });
 
     setLoading(false);

@@ -10,6 +10,7 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import ChatBox from '../shared/ChatBox';
 import RatingForm from './RatingForm';
+import CustomerTrackingMap from './CustomerTrackingMap';
 
 let DefaultIcon = L.icon({
     iconUrl: icon,
@@ -210,30 +211,12 @@ const OrderTracking = () => {
             {(order.status === 'picked_up' || order.status === 'on_way') && (
               <div style={{ height: '250px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
                 {order.deliveryBoy_location ? (
-                  <MapContainer 
-                    bounds={order.delivery_lat ? [
-                      [order.deliveryBoy_location.lat, order.deliveryBoy_location.lng],
-                      [order.delivery_lat, order.delivery_lng!]
-                    ] : undefined}
-                    center={!order.delivery_lat ? [order.deliveryBoy_location.lat, order.deliveryBoy_location.lng] : undefined}
-                    zoom={15} 
-                    style={{ height: '100%', width: '100%' }} 
-                    zoomControl={false}
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    
-                    {/* Rider Marker */}
-                    <Marker position={[order.deliveryBoy_location.lat, order.deliveryBoy_location.lng]}>
-                      <Popup>Your deliveryBoy is here!</Popup>
-                    </Marker>
-                    
-                    {/* Customer Destination Marker */}
-                    {order.delivery_lat && order.delivery_lng && (
-                      <Marker position={[order.delivery_lat, order.delivery_lng]}>
-                        <Popup>Your Delivery Location</Popup>
-                      </Marker>
-                    )}
-                  </MapContainer>
+                  <CustomerTrackingMap 
+                    restaurantLocation={order.restaurants?.lat && order.restaurants?.lng ? { lat: order.restaurants.lat, lng: order.restaurants.lng } : undefined}
+                    customerLocation={order.delivery_lat && order.delivery_lng ? { lat: order.delivery_lat, lng: order.delivery_lng } : undefined}
+                    riderLocation={order.deliveryBoy_location ? { lat: order.deliveryBoy_location.lat, lng: order.deliveryBoy_location.lng } : null}
+                    status={order.status}
+                  />
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', backgroundColor: '#f8f9fa', color: 'var(--primary)', fontWeight: 'bold' }}>
                     Waiting for deliveryBoy GPS signal...

@@ -11,13 +11,16 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+const createCustomIcon = (color: string) => {
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+};
+
+const customerIcon = createCustomIcon('#3b82f6'); // Blue
 
 function LocationMarker({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number, address: string) => void }) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
@@ -40,9 +43,7 @@ function LocationMarker({ onLocationSelect }: { onLocationSelect: (lat: number, 
     },
   });
 
-  return position === null ? null : (
-    <Marker position={position}></Marker>
-  )
+    <Marker position={position} icon={customerIcon}></Marker>
 }
 
 const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () => void }) => {
@@ -79,8 +80,8 @@ const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () =
           total_amount: total,
           status: 'pending_restaurant',
           delivery_address: address,
-          delivery_lat: coordinates ? coordinates.lat : 51.505,
-          delivery_lng: coordinates ? coordinates.lng : -0.09
+          delivery_lat: coordinates ? coordinates.lat : 22.3569,
+          delivery_lng: coordinates ? coordinates.lng : 91.7832
         })
         .select()
         .single();
@@ -172,7 +173,7 @@ const Checkout = ({ onBack, onComplete }: { onBack: () => void, onComplete: () =
         <div>
           <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Select Location on Map</h3>
           <div style={{ height: '400px', width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-            <MapContainer center={[51.505, -0.09]} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
+            <MapContainer center={[22.3569, 91.7832]} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

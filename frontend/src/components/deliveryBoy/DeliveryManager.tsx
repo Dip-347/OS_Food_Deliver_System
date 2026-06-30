@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 // Fix for default marker icons in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import RiderMapDashboard from './RiderMapDashboard';
 
 let DefaultIcon = L.icon({
   iconUrl: icon,
@@ -171,47 +172,30 @@ const DeliveryManager = ({ order, onDeliveryComplete }: DeliveryManagerProps) =>
 
       {error && <div className="auth-error">{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <div className="widget">
-          <h4 style={{ color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={16} /> Pickup From
-          </h4>
-          <p style={{ fontWeight: 'bold', margin: 0 }}>{order.restaurants?.name}</p>
-          <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '0.9rem' }}>Restaurant Location</p>
-        </div>
-
-        <div className="widget">
-          <h4 style={{ color: 'var(--primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Navigation size={16} /> Deliver To
-          </h4>
-          <p style={{ fontWeight: 'bold', margin: 0 }}>{order.users?.full_name || 'Customer'}</p>
-          <p className="text-muted" style={{ margin: '4px 0 0 0', fontSize: '0.9rem' }}>{order.delivery_address}</p>
-        </div>
-      </div>
-
-      <div style={{ height: '300px', width: '100%', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)', marginTop: '8px' }}>
-        {(order.restaurants?.lat && order.delivery_lat) ? (
-          <MapContainer 
-            bounds={[[order.restaurants.lat, order.restaurants.lng], [order.delivery_lat, order.delivery_lng]]} 
-            scrollWheelZoom={false} 
-            style={{ height: '100%', width: '100%' }}
-          >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            
-            <Marker position={[order.restaurants.lat, order.restaurants.lng]}>
-              <Popup><strong>Pickup:</strong> {order.restaurants.name}</Popup>
-            </Marker>
-            
-            <Marker position={[order.delivery_lat, order.delivery_lng]}>
-              <Popup><strong>Delivery:</strong> {order.delivery_address}</Popup>
-            </Marker>
-          </MapContainer>
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', backgroundColor: '#f8f9fa', color: 'var(--text-muted)' }}>
-            Map coordinates unavailable for this order.
-          </div>
-        )}
-      </div>
+      {/* Rider Map Dashboard replaces the old grid and inline map */}
+      <RiderMapDashboard 
+        tasks={[
+          ...(order.restaurants?.lat && order.restaurants?.lng ? [{
+            id: 'pickup-' + order.id,
+            type: 'pickup' as const,
+            lat: order.restaurants.lat,
+            lng: order.restaurants.lng,
+            title: order.restaurants.name,
+            subtitle: 'Pickup Location',
+            orderId: order.id
+          }] : []),
+          ...(order.delivery_lat && order.delivery_lng ? [{
+            id: 'delivery-' + order.id,
+            type: 'delivery' as const,
+            lat: order.delivery_lat,
+            lng: order.delivery_lng,
+            title: order.users?.full_name || 'Customer',
+            subtitle: order.delivery_address,
+            orderId: order.id
+          }] : [])
+        ]}
+        riderLocation={trackingActive && user ? undefined : null} // Rider location handled by component or GPS state if we had it here
+      />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
         {status === 'accepted' && (
